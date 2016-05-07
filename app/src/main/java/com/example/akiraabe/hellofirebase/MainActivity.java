@@ -25,6 +25,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -32,6 +33,8 @@ import java.util.Map;
  * Firebaseとのやり取りは今のところこのクラスで行っています。
  */
 public class MainActivity extends AppCompatActivity {
+
+    ChatMessageAdaptor adapter = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,15 +46,39 @@ public class MainActivity extends AppCompatActivity {
 
         // Firebaseのノードツリーへの参照を取得します。
         Firebase ref = new Firebase(Constant.MY_APP_HOME + "messages");
+        Query queryRef = ref.orderByKey().limitToLast(3); // limitは1以上の数値を指定する必要があります。
 
         // Firebaseから取得したメッセージのリストを表示するためにAdaptorを生成します。
         final ArrayList<ChatMessage> messages = new ArrayList<>();
-        final ChatMessageAdaptor adapter = new ChatMessageAdaptor(this, 0, messages);
+        adapter = new ChatMessageAdaptor(this, 0, messages);
+
+        // 以下は一度だけ実行されるイベントです。
+        /*
+        queryRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot snapshot) {
+                // do some stuff once
+                Iterator it = snapshot.getChildren().iterator() ;
+                while(it.hasNext()){
+                    DataSnapshot snap = (DataSnapshot) it.next();
+                    ChatMessage chatMessage = snap.getValue(ChatMessage.class);
+                    Log.i("SingleValueEvent", String.format("onChildAdded, sender:%s, body:%s",  chatMessage.getSender(), chatMessage.getBody()));
+                    messages.add(0, chatMessage);
+                }
+            }
+            @Override
+            public void onCancelled(FirebaseError firebaseError) {
+            }
+        });
+        */
 
         // Firebaseにデータが追加された時の処理です。
-        ref.addChildEventListener(new ChildEventListener() {
+        queryRef.addChildEventListener(new ChildEventListener() {
             @Override
             public void onChildAdded(DataSnapshot dataSnapshot, String previousKey) {
+                if (previousKey != null) {
+                    Log.i("previousKey", previousKey);
+                }
                 ChatMessage chatMessage = dataSnapshot.getValue(ChatMessage.class);
                 Log.i("Firebase(onChildAdded)", String.format("onChildAdded, sender:%s, body:%s",  chatMessage.getSender(), chatMessage.getBody()));
                 messages.add(0, chatMessage);
@@ -224,6 +251,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        adapter.clear();
         Log.i("LifeCycle", "onDestroy");
     }
 }
