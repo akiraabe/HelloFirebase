@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">HelloFirebase</string>
+    <string name="name">name</string>
+    <string name="message">message</string>
+    <string name="post">Post</string>
+    <string name="back">Back</string>
+    <string name="clear">Clear</string>
+</resources>
