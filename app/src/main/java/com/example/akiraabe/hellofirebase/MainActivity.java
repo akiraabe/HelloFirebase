@@ -19,14 +19,10 @@ import com.firebase.client.DataSnapshot;
 import com.firebase.client.Firebase;
 import com.firebase.client.FirebaseError;
 import com.firebase.client.Query;
-import com.firebase.client.ValueEventListener;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 
 /**
  * メッセージングアプリのメインアクティビティーです。
@@ -34,7 +30,11 @@ import java.util.Map;
  */
 public class MainActivity extends AppCompatActivity {
 
-    ChatMessageAdaptor adapter = null;
+    private ChatMessageAdaptor adapter;
+    private Firebase ref;
+    private Query queryRef;
+    // 初期表示するメッセージの上限数です。
+    private static final int MESSAGE_LIMIT = 20;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,32 +45,70 @@ public class MainActivity extends AppCompatActivity {
         Log.i("LifeCycle", "onCreate");
 
         // Firebaseのノードツリーへの参照を取得します。
-        Firebase ref = new Firebase(Constant.MY_APP_HOME + "messages");
-        Query queryRef = ref.orderByKey().limitToLast(3); // limitは1以上の数値を指定する必要があります。
+        ref = new Firebase(Constant.MY_APP_HOME + "messages");
+        queryRef = ref.orderByKey().limitToLast(MESSAGE_LIMIT); // limitは1以上の数値を指定する必要があります。
+
+        // Postボタンを押下した時の処理です。
+        findViewById(R.id.postButton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                postMessage();
+
+
+            }
+        });
+
+        // Clearボタンを押下した時の処理です。
+        findViewById(R.id.clearButton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+
+                clear();
+            }
+        });
+
+    }
+
+    private void postMessage() {
+        // 画面から入力内容を取得します。
+        EditText eTxtName = (EditText) findViewById(R.id.eTxtName);
+        EditText eTxtMessage = (EditText) findViewById(R.id.eTxtMessage);
+        String name = eTxtName.getText().toString();
+        String message = eTxtMessage.getText().toString();
+
+        Log.i("MainActivity", "name : " + name + ", message : " + message);
+
+        // ChatMessageのVo生成します。
+        ChatMessage post = new ChatMessage();
+        post.setSender(name);
+        post.setBody(message);
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+        post.setTimestamp(sdf.format(new Date()));
+
+        // Firebaseへの書き込みます。
+        Firebase newPostRef = ref.push();
+        newPostRef.setValue(post);
+
+        // 自動採番のキーの取得と表示をします。
+        String postId = newPostRef.getKey();
+        Log.i("**** getKey() : ", postId + "***");
+    }
+
+    private void clear() {
+        EditText eTxtName = (EditText) findViewById(R.id.eTxtName);
+        EditText eTxtMessage = (EditText) findViewById(R.id.eTxtMessage);
+        eTxtName.setText("");
+        eTxtMessage.setText("");
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+        Log.i("LifeCycle", "onStart");
 
         // Firebaseから取得したメッセージのリストを表示するためにAdaptorを生成します。
         final ArrayList<ChatMessage> messages = new ArrayList<>();
         adapter = new ChatMessageAdaptor(this, 0, messages);
-
-        // 以下は一度だけ実行されるイベントです。
-        /*
-        queryRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(DataSnapshot snapshot) {
-                // do some stuff once
-                Iterator it = snapshot.getChildren().iterator() ;
-                while(it.hasNext()){
-                    DataSnapshot snap = (DataSnapshot) it.next();
-                    ChatMessage chatMessage = snap.getValue(ChatMessage.class);
-                    Log.i("SingleValueEvent", String.format("onChildAdded, sender:%s, body:%s",  chatMessage.getSender(), chatMessage.getBody()));
-                    messages.add(0, chatMessage);
-                }
-            }
-            @Override
-            public void onCancelled(FirebaseError firebaseError) {
-            }
-        });
-        */
 
         // Firebaseにデータが追加された時の処理です。
         queryRef.addChildEventListener(new ChildEventListener() {
@@ -141,50 +179,9 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // Postボタンを押下した時の処理です。
-        findViewById(R.id.postButton).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                // 画面からの入力内容を取得
-                EditText eTxtName = (EditText) findViewById(R.id.eTxtName);
-                EditText eTxtMessage = (EditText) findViewById(R.id.eTxtMessage);
-                String name = eTxtName.getText().toString();
-                String message = eTxtMessage.getText().toString();
-
-                Log.i("MainActivity", "name : " + name + ", message : " + message);
-
-                // Firebaseへの参照を保持する
-                Firebase firebaseRef = new Firebase(Constant.MY_APP_HOME + "messages");
-
-                Map<String, String> post = new HashMap<String, String>();
-                post.put("sender", name);
-                post.put("body", message);
-                SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
-                String timestamp = sdf.format(new Date());
-                post.put("timestamp", timestamp);
-                Firebase newPostRef = firebaseRef.push();
-                newPostRef.setValue(post);
-
-                String postId = newPostRef.getKey();
-                Log.i("*** getKey() : ", postId + "***");
-            }
-        });
-
-
-        // Clearボタンを押下した時の処理です。
-        findViewById(R.id.clearButton).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-
-                EditText eTxtName = (EditText) findViewById(R.id.eTxtName);
-                EditText eTxtMessage = (EditText) findViewById(R.id.eTxtMessage);
-                eTxtName.setText("");
-                eTxtMessage.setText("");
-            }
-        });
 
     }
+
 
     // チャットメッセージのアダプター（ほぼ「おまじない」です）
     public class ChatMessageAdaptor extends ArrayAdapter<ChatMessage> {
@@ -218,11 +215,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        Log.i("LifeCycle", "onStart");
-    }
 
     @Override
     public void onResume() {
